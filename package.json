@@ -1,0 +1,25 @@
+{
+  "name": "interview-poc",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "Anthony Cleaver",
+  "license": "ISC",
+  "description": "",
+  "devDependencies": {
+    "@types/node": "^9.4.0",
+    "node-sass": "^4.7.2",
+    "raw-loader": "^0.5.1",
+    "sass-loader": "^6.0.6",
+    "ts-loader": "^3.3.1",
+    "tslint": "^5.9.1",
+    "typescript": "^2.6.2",
+    "webpack": "^3.10.0"
+  },
+  "dependencies": {
+    "@types/ws": "^4.0.0",
+    "ws": "^4.0.0"
+  }
+}
