@@ -1,22 +1,24 @@
 import * as http from 'http';
+import * as https from 'https';
 import * as fs from 'fs';
 import * as ws from 'ws';
 
-let server: http.Server = http.createServer((req: http.IncomingMessage, res: http.ServerResponse) => {
+const options = {
+    key: fs.readFileSync('config/keys/msl1901.key'),
+    cert: fs.readFileSync('config/keys/msl1901.cert')
+};
+
+let server: https.Server = https.createServer(options, (req: http.IncomingMessage, res: http.ServerResponse) => {
     let url: string | void = req.url;
 
     if (url === '/') {
         url = 'index.html';
     }
 
-    if (url === '/api') {
-        console.log('hello');
-    } else {
-        try {
-            res.write(fs.readFileSync(`./static/${url}`));
-        } catch (e) {
-            res.statusCode = 404;
-        }
+    try {
+        res.write(fs.readFileSync(`./static/${url}`));
+    } catch (e) {
+        res.statusCode = 404;
     }
 
     res.end();
@@ -36,9 +38,31 @@ function broadcast(data: any) {
 
 wss.on('connection', function(socket: ws) {
     console.log(`New connection ${socket}`);
+
+    const base64Array: Array<string> = [];
+
     socket.on('message', function(message: string) {
-        console.log('received: %s', message);
-        broadcast(message);
+        const data: any = JSON.parse(message);
+
+        if (data.stream) {
+            console.log(`Stream, chunk: ${data.stream.chunk}, mimetype: ${data.stream.mimeType}`);
+            base64Array[data.stream.chunk] = data.stream.data;
+        } else {
+            console.log('received: %s', message);
+            broadcast(message);
+        }
+    });
+
+    socket.on('close', () => {
+        const buffers: Array<Buffer> = [];
+
+        base64Array.forEach((base64Value) => {
+            buffers.push(Buffer.from(base64Value, 'base64'));
+        });
+
+        const buffer: Buffer = Buffer.concat(buffers);
+
+        fs.appendFileSync('./fileupload.webm', buffer);
     });
 
     socket.on('error', (e) => console.error(e));

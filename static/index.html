@@ -8,6 +8,44 @@
         <div>
             <button data-call="">Call</button>
             <button data-show-local-stream="">Show local stream</button>
+            <button data-stop="">End</button>
+        </div>
+
+        <div data-videos></div>
+
+        <div data-questions>
+            <form data-questions-ask>
+                <label>
+                    Ask a question
+                    <select data-questions-ask-select>
+                        <option value="0">What is love?</option>
+                        <option value="1">How are you?</option>
+                    </select>
+                </label>
+
+                <button type="submit">Ask</button>
+            </form>
+
+            <form data-questions-answer>
+                <fieldset data-questions-answer-fieldset>
+
+                </fieldset>
+            </form>
+        </div>
+
+        <div>
+            <output data-chat-out></output>
+            <form data-chat-in>
+                <label>
+                    Name
+                    <input type="text" data-chat-name />
+                </label>
+                <label>
+                    Message
+                    <input type="text" data-chat-text />
+                </label>
+                <button type="submit">Send</button>
+            </form>
         </div>
         <script src="index.js"></script>
     </body>
