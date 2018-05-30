@@ -1,3 +1,4 @@
+import { WriteStream } from "fs";
 import * as http from 'http';
 import * as https from 'https';
 import * as fs from 'fs';
@@ -7,6 +8,10 @@ const options = {
     key: fs.readFileSync('config/keys/msl1901.key'),
     cert: fs.readFileSync('config/keys/msl1901.cert')
 };
+
+let stream = 0;
+
+const clients: Array<ws> = [];
 
 let server: https.Server = https.createServer(options, (req: http.IncomingMessage, res: http.ServerResponse) => {
     let url: string | void = req.url;
@@ -31,38 +36,40 @@ server.listen({port: 1337, host: '0.0.0.0'}, () => {
 const wss = new ws.Server({ server });
 
 function broadcast(data: any) {
-    wss.clients.forEach((client: ws) => {
-        client.send(data);
+    clients.forEach((client: ws) => {
+        if (client) {
+            try {
+                client.send(data);
+            } catch (e) {
+                console.error(e);
+            }
+        }
     });
 }
 
 wss.on('connection', function(socket: ws) {
-    console.log(`New connection ${socket}`);
+    const thisStream = stream++;
+    console.log(`New connection ${thisStream}`);
 
-    const base64Array: Array<string> = [];
+    const wstream: WriteStream = fs.createWriteStream(`./fileupload-${thisStream}.webm`);
+    const newId: number = clients.push(socket) - 1;
 
-    socket.on('message', function(message: string) {
-        const data: any = JSON.parse(message);
+    socket.send(JSON.stringify({ init: { id: newId, clients: Object.keys(clients) } }));
+    broadcast(JSON.stringify({ joined: { id: newId }}));
 
-        if (data.stream) {
-            console.log(`Stream, chunk: ${data.stream.chunk}, mimetype: ${data.stream.mimeType}`);
-            base64Array[data.stream.chunk] = data.stream.data;
-        } else {
-            console.log('received: %s', message);
+    socket.on('message', function(message: string | Buffer) {
+        if (typeof message === 'string') {
+            const data: any = JSON.parse(message);
+            console.log(`${data.id} is doing a ${Object.keys(data)}`);
             broadcast(message);
+        } else {
+            wstream.write(message);
         }
     });
 
     socket.on('close', () => {
-        const buffers: Array<Buffer> = [];
-
-        base64Array.forEach((base64Value) => {
-            buffers.push(Buffer.from(base64Value, 'base64'));
-        });
-
-        const buffer: Buffer = Buffer.concat(buffers);
-
-        fs.appendFileSync('./fileupload.webm', buffer);
+        wstream.end();
+        clients.splice(newId, 1);
     });
 
     socket.on('error', (e) => console.error(e));

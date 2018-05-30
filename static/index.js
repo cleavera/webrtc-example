@@ -1,7 +1,9 @@
 var peerConnectionConfig = { 'iceServers': [{'urls': 'stun:stun.services.mozilla.com'}, {'urls': 'stun:stun.l.google.com:19302'}] };
-var peerConnection;
+var peerConnections = [];
 var recorder;
 var videoChunks;
+var id;
+
 window.RTCPeerConnection = window.RTCPeerConnection || window.webkitRTCPeerConnection;
 
 document.querySelector('[data-questions-answer]').style.display = 'none';
@@ -30,13 +32,9 @@ var questions = [
     }
 ];
 
-document.querySelector('[data-show-local-stream]').addEventListener('click', () => {
-    showLocalStream();
-});
-
 document.querySelector('[data-call]').addEventListener('click', () => {
     console.log('Start');
-    start(true);
+    start();
 });
 
 document.querySelector('[data-stop]').addEventListener('click', () => {
@@ -53,6 +51,8 @@ document.querySelector('[data-stop]').addEventListener('click', () => {
     var url = window.URL.createObjectURL(blob);
 
     video.src = url;
+
+    document.querySelector('[data-local-stream]').style.display = 'none';
 });
 
 document.querySelector('[data-chat-in]').addEventListener('submit', (e) => {
@@ -84,27 +84,30 @@ document.querySelector('[data-questions-answer]').addEventListener('submit', (e)
     document.querySelector('[data-questions-answer]').style.display = 'none';
 });
 
-function start(isCaller) {
-    peerConnection = new RTCPeerConnection(peerConnectionConfig);
-    peerConnection.onicecandidate = gotIceCandidate;
-    peerConnection.onaddstream = gotRemoteStream;
+showLocalStream();
 
-    if(isCaller) {
-        window.navigator.mediaDevices.getUserMedia({ audio: true, video: true }).then((stream) => {
+function start() {
+    window.navigator.mediaDevices.getUserMedia({ audio: true, video: true }).then((stream) => {
+        peerConnections.forEach((peerConnection, id) => {
             peerConnection.addStream(stream);
 
-            peerConnection.createOffer(gotDescription, errorHandler);
+            peerConnection.createOffer(function(description) {
+                gotDescription(description, id)
+            }, function(error) {
+                console.error(error);
+            });
         });
-    }
+    });
 }
 
 function showLocalStream() {
     window.navigator.mediaDevices.getUserMedia({ audio: false, video: true }).then((stream) => {
-        videoStream(stream);
+        var video = videoStream(stream);
+
+        video.setAttribute('data-local-stream', true);
 
         recorder = new MediaRecorder(stream);
 
-        var chunk = 0;
         videoChunks = [];
 
         recorder.onerror = function(e) {
@@ -113,18 +116,8 @@ function showLocalStream() {
 
         recorder.ondataavailable = function(e) {
             videoChunks.push(e.data);
-            var thisChunk = chunk++;
-            var reader = new FileReader();
-            reader.readAsDataURL(e.data);
-            reader.onloadend = function() {
-                serverConnection.send(JSON.stringify({
-                    stream: {
-                        data: reader.result.replace(/data:[A-z\/]+;base64,/, ''),
-                        chunk: thisChunk,
-                        mimeType: recorder.mimeType
-                    }
-                }));
-            };
+
+            serverConnection.send(e.data);
         };
 
         recorder.start(1000);
@@ -135,6 +128,8 @@ function videoStream(stream) {
     let video = createVideo();
 
     video.srcObject = stream;
+
+    return video;
 }
 
 function createVideo() {
@@ -152,7 +147,8 @@ function gotIceCandidate(event) {
         serverConnection.send(JSON.stringify({
             handshake: {
                 ice: event.candidate
-            }
+            },
+            id: id
         }));
     }
 }
@@ -162,7 +158,8 @@ function sendChat(text, name) {
         message: {
             text: text,
             name: name
-        }
+        },
+        id: id
     }));
 }
 
@@ -170,7 +167,8 @@ function sendQuestion(questionId) {
     serverConnection.send(JSON.stringify({
         question: {
             id: questionId
-        }
+        },
+        id: id
     }));
 }
 
@@ -179,7 +177,8 @@ function sendAnswer(questionId, answerId) {
         answer: {
             question: questionId,
             answer: answerId
-        }
+        },
+        id: id
     }));
 }
 
@@ -188,46 +187,55 @@ function gotRemoteStream(event) {
     videoStream(event.stream);
 }
 
-function errorHandler(error) {
-    console.log(error);
-}
-
-function gotDescription(description) {
-    console.log('got description');
-    peerConnection.setLocalDescription(description, function () {
+function gotDescription(description, otherId) {
+    console.log(`${otherId} got description`);
+    peerConnections[otherId].setLocalDescription(description, function () {
         serverConnection.send(JSON.stringify({
+            for: otherId,
             handshake: {
                 sdp: description
-            }
+            },
+            id: id
         }));
-    }, errorHandler);
+    }, function(error) {
+        console.error(error);
+    });
 }
 
 function gotMessageFromServer(message) {
-    if(!peerConnection) {
-        start(false);
-    }
-
     var signal = JSON.parse(message.data);
+    console.log(`Message: ${JSON.stringify(signal)}`);
 
     if (signal.stream) {
         return;
     }
 
+    if (signal.for && signal.for !== id) {
+        return;
+    }
+
     if (signal.handshake) {
-        gotHandshake(signal.handshake)
+        gotHandshake(signal.handshake, signal.id)
     }
 
     if (signal.message) {
-        gotMessage(signal.message);
+        gotMessage(signal.message, signal.id);
     }
 
     if (signal.question) {
-        gotQuestion(signal.question);
+        gotQuestion(signal.question, signal.id);
     }
 
     if (signal.answer) {
-        gotAnswer(signal.answer);
+        gotAnswer(signal.answer, signal.id);
+    }
+
+    if (signal.init) {
+        gotInit(signal.init);
+    }
+
+    if (signal.joined) {
+        gotJoined(signal.joined);
     }
 }
 
@@ -235,16 +243,25 @@ function gotMessage(message) {
     document.querySelector('[data-chat-out]').innerText += `\n${message.name}: ${message.text}`;
 }
 
-function gotHandshake(handshake) {
+function gotHandshake(handshake, id) {
+    if (!peerConnections[id]) {
+        return;
+    }
+
     if(handshake.sdp) {
-        console.log(handshake.sdp);
-        peerConnection.setRemoteDescription(new RTCSessionDescription(handshake.sdp), function() {
+        peerConnections[id].setRemoteDescription(new RTCSessionDescription(handshake.sdp), function() {
             if(handshake.sdp.type === 'offer') {
-                peerConnection.createAnswer(gotDescription, errorHandler);
+                peerConnections[id].createAnswer(function(description) {
+                    gotDescription(description, id)
+                }, function(error) {
+                    console.error(error);
+                });
             }
-        }, errorHandler);
+        }, function(error) {
+            console.error(error);
+        });
     } else if(handshake.ice) {
-        peerConnection.addIceCandidate(new RTCIceCandidate(handshake.ice));
+        peerConnections[id].addIceCandidate(new RTCIceCandidate(handshake.ice));
     }
 }
 
@@ -301,6 +318,29 @@ function gotAnswer(answer) {
     var q = questions[answer.question];
 
     document.querySelector('[data-chat-out]').innerText += `\n${q.text}: ${q.options[answer.answer]}`;
+}
+
+function gotInit(init) {
+    id = init.id;
+    addClients(init.clients);
+}
+
+function gotJoined(joined) {
+    addClients([joined.id])
+}
+
+function addClients(clients) {
+    console.log(`Adding clients ${clients}`);
+    clients.forEach((clientId) => {
+        if (Number(clientId) === Number(id)) {
+            return;
+        }
+
+        peerConnections[clientId] = new RTCPeerConnection(peerConnectionConfig);
+
+        peerConnections[clientId].onicecandidate = gotIceCandidate;
+        peerConnections[clientId].onaddstream = gotRemoteStream;
+    });
 }
 
 var download = (function () {
