@@ -43,14 +43,14 @@ document.querySelector('[data-stop]').addEventListener('click', () => {
 
     recorder.stop();
 
-    var blob = new Blob(videoChunks, { 'type' : recorder.mimeType });
+    // var blob = new Blob(videoChunks, { 'type' : recorder.mimeType });
 
-    download(blob, `stream-${recorder.mimeType}.webm`);
-    var video = createVideo();
-
-    var url = window.URL.createObjectURL(blob);
-
-    video.src = url;
+    // download(blob, `stream-${recorder.mimeType}.webm`);
+    // var video = createVideo();
+    //
+    // var url = window.URL.createObjectURL(blob);
+    //
+    // video.src = url;
 
     document.querySelector('[data-local-stream]').style.display = 'none';
 });
