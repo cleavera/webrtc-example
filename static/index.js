@@ -52,16 +52,15 @@ document.querySelector('[data-stop]').addEventListener('click', () => {
     //
     // video.src = url;
 
-    document.querySelector('[data-local-stream]').style.display = 'none';
+    document.querySelector('[data-video-local]').style.display = 'none';
 });
 
 document.querySelector('[data-chat-in]').addEventListener('submit', (e) => {
     e.preventDefault();
 
-    var name = document.querySelector('[data-chat-name]');
     var text = document.querySelector('[data-chat-text]');
 
-    sendChat(text.value, name.value);
+    sendChat(text.value, getName());
 
     text.value = '';
 });
@@ -79,7 +78,7 @@ document.querySelector('[data-questions-answer]').addEventListener('submit', (e)
 
     var formData = new FormData(e.target);
 
-    sendAnswer(formData.get('questionId'), formData.get('answerId'));
+    sendAnswer(formData.get('questionId'), formData.get('answerId'), getName());
 
     document.querySelector('[data-questions-answer]').style.display = 'none';
 });
@@ -100,11 +99,15 @@ function start() {
     });
 }
 
+function getName() {
+    var name = document.querySelector('[data-name]');
+
+    return name.value;
+}
+
 function showLocalStream() {
     window.navigator.mediaDevices.getUserMedia({ audio: false, video: true }).then((stream) => {
-        var video = videoStream(stream);
-
-        video.setAttribute('data-local-stream', true);
+        videoStream(stream, 'local');
 
         recorder = new MediaRecorder(stream);
 
@@ -124,18 +127,19 @@ function showLocalStream() {
     });
 }
 
-function videoStream(stream) {
-    let video = createVideo();
+function videoStream(stream, clientId) {
+    let video = createVideo(clientId);
 
     video.srcObject = stream;
 
     return video;
 }
 
-function createVideo() {
+function createVideo(videoId) {
     let video = document.createElement('video');
 
     video.autoplay = true;
+    video.setAttribute(`data-video-${videoId}`, true);
 
     document.querySelector('[data-videos]').appendChild(video);
 
@@ -172,19 +176,20 @@ function sendQuestion(questionId) {
     }));
 }
 
-function sendAnswer(questionId, answerId) {
+function sendAnswer(questionId, answerId, name) {
     serverConnection.send(JSON.stringify({
         answer: {
             question: questionId,
-            answer: answerId
+            answer: answerId,
+            name: name
         },
         id: id
     }));
 }
 
-function gotRemoteStream(event) {
-    console.log('got remote stream', event);
-    videoStream(event.stream);
+function gotRemoteStream(stream, clientId) {
+    console.log('got remote stream', stream);
+    videoStream(stream, clientId);
 }
 
 function gotDescription(description, otherId) {
@@ -237,10 +242,27 @@ function gotMessageFromServer(message) {
     if (signal.joined) {
         gotJoined(signal.joined);
     }
+
+    if (signal.left) {
+        gotLeft(signal.left);
+    }
 }
 
 function gotMessage(message) {
     document.querySelector('[data-chat-out]').innerText += `\n${message.name}: ${message.text}`;
+}
+
+function gotLeft(left) {
+    var video = document.querySelector(`[data-video-${left.id}]`);
+    if (video) {
+        video.parentElement.removeChild(video);
+    }
+
+    if (peerConnections[left.id]) {
+        peerConnections[left.id].close();
+    }
+
+    document.querySelector('[data-chat-out]').innerText += `\nClient ${left.id} left the conversation`;
 }
 
 function gotHandshake(handshake, id) {
@@ -321,11 +343,14 @@ function gotQuestion(question, fromId) {
 function gotAnswer(answer) {
     var q = questions[answer.question];
 
-    document.querySelector('[data-chat-out]').innerText += `\n${q.text}: ${q.options[answer.answer]}`;
+    document.querySelector('[data-chat-out]').innerText += `\n${answer.name}: ${q.text} ${q.options[answer.answer]}`;
 }
 
 function gotInit(init) {
     id = init.id;
+
+    document.querySelector('[data-name]').value = `client-${id}`;
+
     addClients(init.clients);
 }
 
@@ -343,20 +368,22 @@ function addClients(clients) {
         peerConnections[clientId] = new RTCPeerConnection(peerConnectionConfig);
 
         peerConnections[clientId].onicecandidate = gotIceCandidate;
-        peerConnections[clientId].onaddstream = gotRemoteStream;
+        peerConnections[clientId].onaddstream = (event) => {
+            gotRemoteStream(event.stream, clientId);
+        };
     });
 }
 
-var download = (function () {
-    var a = document.createElement('a');
-
-    document.body.appendChild(a);
-    a.style.display = 'none';
-    return function (blob, fileName) {
-        var url = window.URL.createObjectURL(blob);
-        a.href = url;
-        a.download = fileName;
-        a.click();
-        window.URL.revokeObjectURL(url);
-    };
-}());
+// var download = (function () {
+//     var a = document.createElement('a');
+//
+//     document.body.appendChild(a);
+//     a.style.display = 'none';
+//     return function (blob, fileName) {
+//         var url = window.URL.createObjectURL(blob);
+//         a.href = url;
+//         a.download = fileName;
+//         a.click();
+//         window.URL.revokeObjectURL(url);
+//     };
+// }());

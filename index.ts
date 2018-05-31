@@ -37,7 +37,7 @@ const wss = new ws.Server({ server });
 
 function broadcast(data: any) {
     clients.forEach((client: ws) => {
-        if (client) {
+        if (client && client.readyState === ws.OPEN) {
             try {
                 client.send(data);
             } catch (e) {
@@ -67,10 +67,18 @@ wss.on('connection', function(socket: ws) {
         }
     });
 
-    socket.on('close', () => {
+    function close() {
         wstream.end();
-        clients.splice(newId, 1);
-    });
+        broadcast(JSON.stringify({
+            left: {
+                id: newId
+            }
+        }));
+    }
 
-    socket.on('error', (e) => console.error(e));
+    socket.on('close', close);
+
+    socket.on('error', (e) => {
+        console.error(e);
+    });
 });
