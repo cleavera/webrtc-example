@@ -43,15 +43,6 @@ document.querySelector('[data-stop]').addEventListener('click', () => {
 
     recorder.stop();
 
-    // var blob = new Blob(videoChunks, { 'type' : recorder.mimeType });
-
-    // download(blob, `stream-${recorder.mimeType}.webm`);
-    // var video = createVideo();
-    //
-    // var url = window.URL.createObjectURL(blob);
-    //
-    // video.src = url;
-
     document.querySelector('[data-video-local]').style.display = 'none';
 });
 
@@ -373,17 +364,3 @@ function addClients(clients) {
         };
     });
 }
-
-// var download = (function () {
-//     var a = document.createElement('a');
-//
-//     document.body.appendChild(a);
-//     a.style.display = 'none';
-//     return function (blob, fileName) {
-//         var url = window.URL.createObjectURL(blob);
-//         a.href = url;
-//         a.download = fileName;
-//         a.click();
-//         window.URL.revokeObjectURL(url);
-//     };
-// }());
