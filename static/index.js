@@ -297,7 +297,11 @@ function createHiddenInput(questionId, name) {
     return input;
 }
 
-function gotQuestion(question) {
+function gotQuestion(question, fromId) {
+    if (Number(fromId) === Number(id)) {
+        return;
+    }
+
     var q = questions[question.id];
 
     var fieldset = document.querySelector('[data-questions-answer-fieldset]');
