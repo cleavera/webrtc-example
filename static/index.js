@@ -13,6 +13,10 @@ serverConnection.onmessage = (message) => {
     gotMessageFromServer(message);
 };
 
+serverConnection.onclose = () => {
+    stop();
+};
+
 var questions = [
     {
         text: 'What is love?',
@@ -37,14 +41,16 @@ document.querySelector('[data-call]').addEventListener('click', () => {
     start();
 });
 
-document.querySelector('[data-stop]').addEventListener('click', () => {
+document.querySelector('[data-stop]').addEventListener('click', stop);
+
+function stop () {
     console.log('End');
     serverConnection.close();
 
     recorder.stop();
 
     document.querySelector('[data-video-local]').style.display = 'none';
-});
+}
 
 document.querySelector('[data-chat-in]').addEventListener('submit', (e) => {
     e.preventDefault();
