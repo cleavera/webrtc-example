@@ -29,8 +29,8 @@ let server: https.Server = https.createServer(options, (req: http.IncomingMessag
     res.end();
 });
 
-server.listen({port: 1337, host: '0.0.0.0'}, () => {
-    console.info((new Date()) + ' Server is listening on port 1337');
+server.listen({port: 443, host: '0.0.0.0'}, () => {
+    console.info((new Date()) + ' Server is listening on port 443');
 });
 
 const wss = new ws.Server({ server });

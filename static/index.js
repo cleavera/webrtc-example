@@ -8,7 +8,7 @@ window.RTCPeerConnection = window.RTCPeerConnection || window.webkitRTCPeerConne
 
 document.querySelector('[data-questions-answer]').style.display = 'none';
 
-const serverConnection = new WebSocket('wss://localhost:1337');
+const serverConnection = new WebSocket(`wss://${location.host}`);
 serverConnection.onmessage = (message) => {
     gotMessageFromServer(message);
 };
@@ -18,7 +18,7 @@ var questions = [
         text: 'What is love?',
         options: [
             'Baby dont hurt me',
-            'Baby dont hurt me',
+            'Dont hurt me',
             'No more'
         ]
     },
