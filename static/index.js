@@ -17,25 +17,6 @@ serverConnection.onclose = () => {
     stop();
 };
 
-var questions = [
-    {
-        text: 'What is love?',
-        options: [
-            'Baby dont hurt me',
-            'Dont hurt me',
-            'No more'
-        ]
-    },
-    {
-        text: 'How are you?',
-        options: [
-            'Great',
-            'Not great',
-            'Bad'
-        ]
-    }
-];
-
 document.querySelector('[data-call]').addEventListener('click', () => {
     console.log('Start');
     start();
@@ -52,34 +33,6 @@ function stop () {
     document.querySelector('[data-video-local]').style.display = 'none';
 }
 
-document.querySelector('[data-chat-in]').addEventListener('submit', (e) => {
-    e.preventDefault();
-
-    var text = document.querySelector('[data-chat-text]');
-
-    sendChat(text.value, getName());
-
-    text.value = '';
-});
-
-document.querySelector('[data-questions-ask]').addEventListener('submit', (e) => {
-    e.preventDefault();
-
-    var question = document.querySelector('[data-questions-ask-select]');
-
-    sendQuestion(question.value);
-});
-
-document.querySelector('[data-questions-answer]').addEventListener('submit', (e) => {
-    e.preventDefault();
-
-    var formData = new FormData(e.target);
-
-    sendAnswer(formData.get('questionId'), formData.get('answerId'), getName());
-
-    document.querySelector('[data-questions-answer]').style.display = 'none';
-});
-
 showLocalStream();
 
 function start() {
@@ -94,12 +47,6 @@ function start() {
             });
         });
     });
-}
-
-function getName() {
-    var name = document.querySelector('[data-name]');
-
-    return name.value;
 }
 
 function showLocalStream() {
@@ -156,36 +103,6 @@ function gotIceCandidate(event) {
     }
 }
 
-function sendChat(text, name) {
-    serverConnection.send(JSON.stringify({
-        message: {
-            text: text,
-            name: name
-        },
-        id: id
-    }));
-}
-
-function sendQuestion(questionId) {
-    serverConnection.send(JSON.stringify({
-        question: {
-            id: questionId
-        },
-        id: id
-    }));
-}
-
-function sendAnswer(questionId, answerId, name) {
-    serverConnection.send(JSON.stringify({
-        answer: {
-            question: questionId,
-            answer: answerId,
-            name: name
-        },
-        id: id
-    }));
-}
-
 function gotRemoteStream(stream, clientId) {
     console.log('got remote stream', stream);
     videoStream(stream, clientId);
@@ -222,18 +139,6 @@ function gotMessageFromServer(message) {
         gotHandshake(signal.handshake, signal.id)
     }
 
-    if (signal.message) {
-        gotMessage(signal.message, signal.id);
-    }
-
-    if (signal.question) {
-        gotQuestion(signal.question, signal.id);
-    }
-
-    if (signal.answer) {
-        gotAnswer(signal.answer, signal.id);
-    }
-
     if (signal.init) {
         gotInit(signal.init);
     }
@@ -245,10 +150,6 @@ function gotMessageFromServer(message) {
     if (signal.left) {
         gotLeft(signal.left);
     }
-}
-
-function gotMessage(message) {
-    document.querySelector('[data-chat-out]').innerText += `\n${message.name}: ${message.text}`;
 }
 
 function gotLeft(left) {
@@ -284,65 +185,6 @@ function gotHandshake(handshake, id) {
     } else if(handshake.ice) {
         peerConnections[id].addIceCandidate(new RTCIceCandidate(handshake.ice));
     }
-}
-
-function createButton(label, value) {
-    let button = document.createElement('button');
-
-    button.innerText = label;
-    button.name = 'answer';
-    button.addEventListener('click', () => {
-        var fieldset = document.querySelector('[data-questions-answer-fieldset]');
-
-        fieldset.appendChild(createHiddenInput(value, 'answerId'));
-    });
-
-    return button;
-}
-
-function createLegend(label) {
-    let legend = document.createElement('legend');
-
-    legend.innerText = label;
-
-    return legend;
-}
-
-function createHiddenInput(questionId, name) {
-    let input = document.createElement('input');
-
-    input.type = 'hidden';
-    input.value = questionId;
-    input.name = name;
-
-    return input;
-}
-
-function gotQuestion(question, fromId) {
-    if (Number(fromId) === Number(id)) {
-        return;
-    }
-
-    var q = questions[question.id];
-
-    var fieldset = document.querySelector('[data-questions-answer-fieldset]');
-
-    fieldset.innerHTML = '';
-
-    fieldset.appendChild(createLegend(q.text));
-    fieldset.appendChild(createHiddenInput(question.id, 'questionId'));
-
-    q.options.forEach((option, index) => {
-        fieldset.appendChild(createButton(option, index));
-    });
-
-    document.querySelector('[data-questions-answer]').style.display = 'block';
-}
-
-function gotAnswer(answer) {
-    var q = questions[answer.question];
-
-    document.querySelector('[data-chat-out]').innerText += `\n${answer.name}: ${q.text} ${q.options[answer.answer]}`;
 }
 
 function gotInit(init) {
