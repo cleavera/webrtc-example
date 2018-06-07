@@ -121,6 +121,8 @@ function showLocalStream() {
         };
 
         recorder.start(1000);
+    }, (e) => {
+        console.error(e);
     });
 }
 
